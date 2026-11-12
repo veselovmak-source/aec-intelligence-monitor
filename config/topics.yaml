@@ -1,0 +1,53 @@
+version: 1
+language: ru
+topics:
+  - id: pd_rd_review
+    name: Проверка проектной и рабочей документации
+    priority: critical
+    enabled: true
+    keywords: [design review, drawing review, document checking, проверка ПД, проверка РД, compliance]
+  - id: hvac
+    name: ОВиК, отопление, вентиляция и кондиционирование
+    priority: high
+    enabled: true
+    keywords: [HVAC, heating, ventilation, air conditioning, smoke control, противодымная вентиляция]
+  - id: water_supply
+    name: ВК — водоснабжение и канализация
+    priority: high
+    enabled: true
+    keywords: [plumbing, water supply, drainage, водоснабжение, канализация]
+  - id: electrical
+    name: ЭОМ, ЭО, ЭС
+    priority: high
+    enabled: true
+    keywords: [electrical, power distribution, lighting, ЭОМ, ЭО, ЭС]
+  - id: architecture_structures
+    name: АР и КР
+    priority: high
+    enabled: true
+    keywords: [architecture, structural, reinforcement, facade, конструктив, армирование]
+  - id: bim_ifc
+    name: BIM, IFC, BCF и координация
+    priority: critical
+    enabled: true
+    keywords: [BIM, IFC, BCF, clash detection, MEP coordination, model checking]
+  - id: cad_pdf_ocr
+    name: PDF, CAD, DWG, DXF, OCR и анализ чертежей
+    priority: critical
+    enabled: true
+    keywords: [PDF extraction, CAD agent, DWG, DXF, OCR, blueprint QA]
+  - id: estimating_qto
+    name: Сметы, QTO, takeoff и ведомости объёмов
+    priority: critical
+    enabled: true
+    keywords: [quantity takeoff, QTO, cost estimate, BOQ, смета, объемы работ]
+  - id: russian_standards
+    name: СП, ГОСТ, ПУЭ и нормативная проверка
+    priority: critical
+    enabled: true
+    keywords: [СП, ГОСТ, ПУЭ, нормативная проверка, Russian building codes]
+  - id: agent_skills
+    name: AI-агенты, промпты, Agent Skills, RAG и MCP
+    priority: high
+    enabled: true
+    keywords: [prompt, agent skill, SKILL.md, RAG, MCP, multi-agent, LLM]
