@@ -1,0 +1,34 @@
+name: Daily AEC prompt monitor
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"
+permissions:
+  contents: read
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Restore state
+        uses: actions/cache@v4
+        with:
+          path: data/monitor.db
+          key: aec-monitor-db-\${{ github.run_id }}
+          restore-keys: |
+            aec-monitor-db-
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run monitor
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+        run: python -m src.monitor
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aec-monitor-report-\${{ github.run_number }}
+          path: reports/latest.md
+          retention-days: 90
