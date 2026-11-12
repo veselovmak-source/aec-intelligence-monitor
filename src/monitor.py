@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, base64, hashlib, os, re, sqlite3
+import argparse, base64, hashlib, json, os, re, sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -23,6 +23,7 @@ def db_connect():
     con.execute("""CREATE TABLE IF NOT EXISTS repo_state(repo TEXT PRIMARY KEY,sha TEXT,release_tag TEXT,checked_at TEXT,meta_hash TEXT)""")
     con.execute("""CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,repo TEXT,kind TEXT,old_value TEXT,new_value TEXT,url TEXT,detected_at TEXT,UNIQUE(repo,kind,new_value))""")
     con.execute("""CREATE TABLE IF NOT EXISTS artifacts(repo TEXT,path TEXT,blob_sha TEXT,content_hash TEXT,category TEXT,seen_at TEXT,url TEXT,excerpt TEXT,PRIMARY KEY(repo,path,blob_sha))""")
+    con.execute("""CREATE TABLE IF NOT EXISTS analyses(repo TEXT,path TEXT,blob_sha TEXT,analyzed_at TEXT,model TEXT,score REAL,is_relevant INTEGER,payload_json TEXT,PRIMARY KEY(repo,path,blob_sha))""")
     con.commit()
     return con
 
@@ -56,7 +57,7 @@ def snapshot(repo:str):
     digest=hashlib.sha256(repr(sorted(m.items())).encode()).hexdigest()
     return {"sha":commit["sha"],"commit_url":commit["html_url"],"tag":tag,"release_url":url,"meta_hash":digest,"meta":m}
 
-def inspect_changes(con,repo,old_sha,new_sha,now):
+def inspect_changes(con,repo,old_sha,new_sha,now,license_id,topics):
     data=gh(f"/repos/{repo}/compare/{quote(old_sha,safe='')}...{quote(new_sha,safe='')}")
     found=[]
     for item in data.get("files",[]):
@@ -73,8 +74,21 @@ def inspect_changes(con,repo,old_sha,new_sha,now):
                     content=base64.b64decode(raw["content"]).decode("utf-8",errors="replace")
                     digest=hashlib.sha256(content.encode()).hexdigest()
                     category=classify(path,content); excerpt=re.sub(r"\s+"," ",content).strip()[:420]
+                    blob_sha=raw.get("sha","")
                     con.execute("INSERT OR IGNORE INTO artifacts VALUES(?,?,?,?,?,?,?,?)",
-                        (repo,path,raw.get("sha",""),digest,category,now,url,excerpt))
+                        (repo,path,blob_sha,digest,category,now,url,excerpt))
+                    if os.getenv("OPENAI_API_KEY") and blob_sha:
+                        exists=con.execute("SELECT 1 FROM analyses WHERE repo=? AND path=? AND blob_sha=?",(repo,path,blob_sha)).fetchone()
+                        if not exists:
+                            try:
+                                from src.analyzer import analyze_artifact
+                                result=analyze_artifact(repo=repo,path=path,category=category,content=content,
+                                    source_url=url,license_id=license_id,topics=topics)
+                                con.execute("INSERT OR REPLACE INTO analyses VALUES(?,?,?,?,?,?,?,?)",
+                                    (repo,path,blob_sha,now,result.get("model","unknown"),result["overall_score"],
+                                     int(result["is_relevant"]),json.dumps(result,ensure_ascii=False)))
+                            except Exception as err:
+                                print(f"LLM analysis failed for {repo}/{path}: {err}")
             except Exception as e: excerpt=f"[Не удалось получить содержимое: {str(e)[:150]}]"
         else: url=f"https://github.com/{repo}/commit/{new_sha}"
         label={"added":"Добавлен","removed":"Удалён","renamed":"Переименован"}.get(status,"Изменён")
@@ -94,7 +108,7 @@ def run_once():
             else:
                 old_sha,old_tag,old_meta=old
                 if old_sha!=s["sha"]:
-                    changed,cmp_url=inspect_changes(con,repo,old_sha,s["sha"],now)
+                    changed,cmp_url=inspect_changes(con,repo,old_sha,s["sha"],now,s["meta"].get("license"),load_yaml(ROOT/"config"/"topics.yaml").get("topics",[]))
                     con.execute("INSERT OR IGNORE INTO events(repo,kind,old_value,new_value,url,detected_at) VALUES(?,?,?,?,?,?)",(repo,"commit",old_sha,s["sha"],cmp_url,now))
                     events.append({"repo":repo,"kind":"Новый commit","details":f"{old_sha[:8]} -> {s['sha'][:8]}","url":cmp_url,"files":changed})
                 if old_tag!=s["tag"] and s["tag"]:
@@ -114,6 +128,19 @@ def run_once():
             lines += [f"- **{f['label']} файл**: {f['path']} — {f['category']}; изменений строк: {f['changes']}",f"  [Открыть файл]({f['url']})"]
             if f["excerpt"]: lines.append("  Фрагмент: "+f["excerpt"])
         if ev["files"]: lines.append("")
+    lines += ["## LLM-анализ",""]
+    if os.getenv("OPENAI_API_KEY"):
+        rows=con.execute("SELECT repo,path,score,payload_json FROM analyses ORDER BY analyzed_at DESC LIMIT 30").fetchall()
+        if rows:
+            for repo_name,path_name,score,payload in rows:
+                item=json.loads(payload)
+                lines.append(f"- **{score:.2f}/5 — {repo_name}/{path_name}**: {item.get('summary','')}")
+                lines.append(f"  Применение: {'; '.join(item.get('practical_use_cases',[])[:3]) or 'не указано'}")
+                lines.append(f"  Лицензия: {item.get('license_status')}; СП/ГОСТ: {item.get('russian_standards_status')}; действие: {item.get('recommended_action')}")
+        else:
+            lines.append("Пока нет завершённых LLM-анализов.")
+    else:
+        lines.append("LLM отключён: добавьте OPENAI_API_KEY и OPENAI_MODEL в Secrets GitHub Actions.")
     lines += ["## Ошибки проверки",""]+[f"- {r}: {e}" for r,e in errors] or ["Ошибок не зарегистрировано."]
     lines += ["","## Ограничения","Сейчас отслеживаются изменения текстовых и конфигурационных файлов в GitHub commits. Извлечённые фрагменты не являются экспертной оценкой. Web/RSS и LLM-анализ будут добавлены отдельно."]
     REPORT.write_text("\n".join(lines),encoding="utf-8")
