@@ -1,0 +1,25 @@
+version: 1
+github:
+  enabled: true
+  repositories:
+    - {repo: Snega90/eco-prompts-aec, group: aec_prompts, priority: high}
+    - {repo: constructelligence-lab/construction-agent-skills, group: agent_skills, priority: critical}
+    - {repo: thebrownproject/buildbrain, group: bim_ai, priority: critical}
+    - {repo: 1378/Construction-PDF-Validation-AI, group: pdf_validation, priority: critical}
+    - {repo: jeremylongshore/cad-ai-agent, group: cad_ai, priority: critical}
+    - {repo: shlok1806/blueprint-qa, group: drawing_qa, priority: high}
+    - {repo: louistrue/agentic-bim-team, group: multi_agent_bim, priority: high}
+    - {repo: natnew/Awesome-AI-for-AEC-Delivery, group: aec_catalog, priority: high}
+    - {repo: ArchSightLabs/archsight-aios, group: aec_platform, priority: medium}
+    - {repo: constructelligence-lab/construction-project-records, group: construction_records, priority: medium}
+    - {repo: dakhlallah/arch-render, group: architecture_ai, priority: medium}
+    - {repo: constructelligence-lab/ai-in-construction, group: aec_ai_guide, priority: medium}
+    - {repo: constructelligence-lab/open-source-construction-tools, group: construction_tools, priority: medium}
+    - {repo: indra2215/research-monitor, group: monitoring_reference, priority: high}
+    - {repo: abdulsalam-create/bounty-watch, group: monitoring_reference, priority: medium}
+    - {repo: parallel-web/parallel-cookbook, group: research_automation_reference, priority: medium}
+    - {repo: quanticsoul4772/exa-mcp-server, group: search_infrastructure_reference, priority: medium}
+web:
+  enabled: false
+  rss_feeds: []
+  note: "Подключить проверенные RSS/Atom и поисковые API на этапе 3."
