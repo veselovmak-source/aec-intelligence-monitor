@@ -27,7 +27,8 @@ def db_connect():
     con.execute("""CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,repo TEXT,kind TEXT,old_value TEXT,new_value TEXT,url TEXT,detected_at TEXT,UNIQUE(repo,kind,new_value))""")
     con.execute("""CREATE TABLE IF NOT EXISTS artifacts(repo TEXT,path TEXT,blob_sha TEXT,content_hash TEXT,category TEXT,seen_at TEXT,url TEXT,excerpt TEXT,PRIMARY KEY(repo,path,blob_sha))""")
     con.execute("""CREATE TABLE IF NOT EXISTS analyses(repo TEXT,path TEXT,blob_sha TEXT,analyzed_at TEXT,model TEXT,score REAL,is_relevant INTEGER,payload_json TEXT,PRIMARY KEY(repo,path,blob_sha))""")
-    con.execute("""CREATE TABLE IF NOT EXISTS web_items(source_id TEXT,item_id TEXT,title TEXT,url TEXT,published TEXT,summary TEXT,first_seen TEXT,PRIMARY KEY(source_id,item_id))""")
+    con.execute("""CREATE TABLE IF NOT EXISTS web_items(source_id TEXT,item_id TEXT,title TEXT,url TEXT,published TEXT,summary TEXT,content_hash TEXT,first_seen TEXT,PRIMARY KEY(source_id,item_id))""")
+    con.execute("""CREATE TABLE IF NOT EXISTS web_sources_state(source_id TEXT PRIMARY KEY,initialized_at TEXT)""")
     con.commit()
     return con
 
@@ -194,27 +195,60 @@ def monitor_web_sources(con, cfg, now, events, errors):
         try:
             items = fetch_web_feed(feed)
             checked += 1
-            known_before = con.execute("SELECT COUNT(*) FROM web_items WHERE source_id=?", (source_id,)).fetchone()[0]
-            new_count = 0
+            initialized = con.execute(
+                "SELECT 1 FROM web_sources_state WHERE source_id=?", (source_id,)
+            ).fetchone() is not None
+            new_count = updated_count = 0
             for item in items:
-                cur = con.execute(
-                    "INSERT OR IGNORE INTO web_items(source_id,item_id,title,url,published,summary,first_seen) VALUES(?,?,?,?,?,?,?)",
-                    (source_id, item["item_id"], item["title"], item["url"], item["published"], item["summary"], now)
-                )
-                if cur.rowcount and known_before > 0:
-                    new_count += 1
-                    details = item["title"]
-                    if item["published"]:
-                        details += f" (дата: {item['published']})"
-                    if item["summary"]:
-                        details += "\n\n" + item["summary"][:500]
-                    events.append({"repo": name, "kind": "Новая внешняя публикация",
-                                   "details": details, "url": item["url"] or feed["url"], "files": []})
+                fingerprint = hashlib.sha256(
+                    json.dumps(item, ensure_ascii=False, sort_keys=True).encode("utf-8")
+                ).hexdigest()
+                old = con.execute(
+                    "SELECT title,url,published,summary,content_hash FROM web_items WHERE source_id=? AND item_id=?",
+                    (source_id, item["item_id"])
+                ).fetchone()
+                if old is None:
+                    con.execute(
+                        "INSERT INTO web_items(source_id,item_id,title,url,published,summary,content_hash,first_seen) VALUES(?,?,?,?,?,?,?,?)",
+                        (source_id, item["item_id"], item["title"], item["url"],
+                         item["published"], item["summary"], fingerprint, now)
+                    )
+                    if initialized:
+                        new_count += 1
+                        kind = "Новая внешняя публикация"
+                    else:
+                        continue
+                elif old[4] != fingerprint:
+                    con.execute(
+                        "UPDATE web_items SET title=?,url=?,published=?,summary=?,content_hash=? WHERE source_id=? AND item_id=?",
+                        (item["title"], item["url"], item["published"], item["summary"],
+                         fingerprint, source_id, item["item_id"])
+                    )
+                    if initialized:
+                        updated_count += 1
+                        kind = "Обновлена внешняя публикация"
+                    else:
+                        continue
+                else:
+                    continue
+                details = item["title"]
+                if item["published"]:
+                    details += f" (дата: {item['published']})"
+                if item["summary"]:
+                    details += "\\n\\n" + item["summary"][:500]
+                events.append({
+                    "repo": name, "kind": kind, "details": details,
+                    "url": item["url"] or feed["url"], "files": []
+                })
+            con.execute(
+                "INSERT OR IGNORE INTO web_sources_state(source_id,initialized_at) VALUES(?,?)",
+                (source_id, now)
+            )
             con.commit()
-            if known_before == 0:
+            if not initialized:
                 print(f"Web baseline: {name}; indexed={len(items)}")
             else:
-                print(f"Web feed: {name}; items={len(items)}; new={new_count}")
+                print(f"Web feed: {name}; items={len(items)}; new={new_count}; updated={updated_count}")
         except Exception as e:
             errors.append((f"WEB:{name}", str(e)[:250]))
     return checked
