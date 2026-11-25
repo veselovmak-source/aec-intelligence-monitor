@@ -18,7 +18,10 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
+      # OpenAI analysis is optional. It stays disabled unless the repository
+      # variable OPENAI_API_ENABLED is explicitly set to "true".
       - name: Verify OpenAI API access
+        if: ${{ vars.OPENAI_API_ENABLED == 'true' }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
@@ -26,7 +29,7 @@ jobs:
       - name: Run monitor
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ vars.OPENAI_API_ENABLED == 'true' && secrets.OPENAI_API_KEY || '' }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
         run: python -m src.monitor
       - name: Save persistent registry
