@@ -20,6 +20,18 @@ github:
     - {repo: parallel-web/parallel-cookbook, group: research_automation_reference, priority: medium}
     - {repo: quanticsoul4772/exa-mcp-server, group: search_infrastructure_reference, priority: medium}
 web:
-  enabled: false
-  rss_feeds: []
-  note: "Подключить проверенные RSS/Atom и поисковые API на этапе 3."
+  enabled: true
+  rss_feeds:
+    - id: aecmag_featured
+      name: AEC Magazine — AI, BIM, CAD и строительство
+      url: "https://aecmag.com/?format=feed&id=featured&type=rss"
+    - id: graphisoft_blog
+      name: Graphisoft Blog
+      url: "https://graphisoft.com/us/feed"
+    - id: tejjy_blog
+      name: Tejjy — BIM и инженерное проектирование
+      url: "https://www.tejjy.com/feed/"
+    - id: the_aec_associates
+      name: The AEC Associates — CAD/BIM и проектирование
+      url: "https://theaecassociates.com/blog/feed/"
+  note: "RSS/Atom источники; новые публикации фиксируются после создания baseline."
