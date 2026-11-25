@@ -145,6 +145,8 @@ def run_once():
     lines += ["","## Ограничения","Сейчас отслеживаются изменения текстовых и конфигурационных файлов в GitHub commits. Извлечённые фрагменты не являются экспертной оценкой. Web/RSS и LLM-анализ будут добавлены отдельно."]
     REPORT.write_text("\n".join(lines),encoding="utf-8")
     print(f"Report: {REPORT}; events={len(events)}; errors={len(errors)}")
+    if errors:
+        raise SystemExit(f"{len(errors)} source(s) failed; see report for details")
 
 if __name__=="__main__":
     argparse.ArgumentParser().parse_args()
