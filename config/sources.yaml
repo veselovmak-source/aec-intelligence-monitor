@@ -24,7 +24,7 @@ web:
   rss_feeds:
     - id: aecmag_featured
       name: AEC Magazine — AI, BIM, CAD и строительство
-      url: "https://aecmag.com/?format=feed&id=featured&type=rss"
+      url: "https://aecmag.com/feed/"
     - id: graphisoft_blog
       name: Graphisoft Blog
       url: "https://graphisoft.com/us/feed"
